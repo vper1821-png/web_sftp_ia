@@ -9,8 +9,8 @@ on:
 env:
   REGISTRY: ghcr.io
   # IMPORTANTE: cambia "TU_USUARIO" por tu nombre de usuario u organización de GitHub
-  IMAGE_NAME_WEB: ghcr.io/TU_USUARIO/web_sftp_ia-web
-  IMAGE_NAME_SFTP: ghcr.io/TU_USUARIO/web_sftp_ia-sftp
+  IMAGE_NAME_WEB: ghcr.io/vper1821-png/web_sftp_ia-web
+  IMAGE_NAME_SFTP: ghcr.io/vper1821-png/web_sftp_ia-sftp
 
 jobs:
   build:
