@@ -1,0 +1,99 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: web-code-pvc
+  namespace: asistente-correo
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: asistente-correo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      initContainers:
+      - name: clone-repo
+        image: alpine/git:latest
+        args:
+          - clone
+          - --branch
+          - main
+          - https://github.com/tuusuario/asistente-correo.git
+          - /var/www/html
+        volumeMounts:
+        - name: web-code
+          mountPath: /var/www/html
+      containers:
+      - name: php-apache
+        image: tuusuario/asistente-web:latest
+        ports:
+        - containerPort: 80
+        env:
+        - name: DB_HOST
+          value: mysql-svc
+        - name: DB_NAME
+          value: correos_db
+        - name: DB_USER
+          value: appuser
+        - name: DB_PASS
+          valueFrom:
+            secretKeyRef:
+              name: mysql-pass
+              key: user-password
+        - name: IMAP_SERVER
+          valueFrom:
+            secretKeyRef:
+              name: creds-email
+              key: imap-server
+        - name: IMAP_USER
+          valueFrom:
+            secretKeyRef:
+              name: creds-email
+              key: imap-user
+        - name: IMAP_PASS
+          valueFrom:
+            secretKeyRef:
+              name: creds-email
+              key: imap-password
+        - name: SMTP_SERVER
+          valueFrom:
+            secretKeyRef:
+              name: creds-email
+              key: smtp-server
+        - name: SMTP_PORT
+          valueFrom:
+            secretKeyRef:
+              name: creds-email
+              key: smtp-port
+        - name: SMTP_USER
+          valueFrom:
+            secretKeyRef:
+              name: creds-email
+              key: smtp-user
+        - name: SMTP_PASS
+          valueFrom:
+            secretKeyRef:
+              name: creds-email
+              key: smtp-password
+        volumeMounts:
+        - name: web-code
+          mountPath: /var/www/html
+      volumes:
+      - name: web-code
+        persistentVolumeClaim:
+          claimName: web-code-pvc
