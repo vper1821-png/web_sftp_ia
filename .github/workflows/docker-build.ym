@@ -1,0 +1,95 @@
+# .github/workflows/docker-build.yml
+name: Build and Push Docker Images
+
+on:
+  push:
+    branches:
+      - 'main'          # Se ejecuta al hacer push a la rama principal
+    tags:
+      - 'v*'            # Se ejecuta al crear un nuevo tag, ej: v1.0.0
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME_WEB: ${{ github.repository }}-web
+  IMAGE_NAME_SFTP: ${{ github.repository }}-sftp
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write  # Permiso necesario para subir imágenes a GHCR
+
+    steps:
+      # 1. Clona el repositorio
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Configura QEMU para builds multi-arquitectura (amd64, arm64)
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: all
+
+      # 3. Configura Docker Buildx para builds avanzados
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # 4. Inicia sesión en GHCR usando el GITHUB_TOKEN automático de GitHub.
+      # La acción usa por defecto https://ghcr.io (GitHub Container Registry)
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}[reference:0]
+
+      # 5. Obtiene metadatos para las etiquetas (tags) de las imágenes.
+      # Esto genera tags como 'latest', 'pr-<numero>', o el tag de versión.
+      - name: Extract metadata for Web image
+        id: meta-web
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_WEB }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix=git-
+
+      - name: Extract metadata for SFTP image
+        id: meta-sftp
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_SFTP }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix=git-
+
+      # 6. Construye y sube la imagen web (PHP + Apache)
+      - name: Build and push web image
+        uses: docker/build-push-action@v5
+        with:
+          context: docker/web
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.meta-web.outputs.tags }}
+          labels: ${{ steps.meta-web.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # 7. Construye y sube la imagen sftp (Alpine + OpenSSH)
+      - name: Build and push sftp image
+        uses: docker/build-push-action@v5
+        with:
+          context: docker/sftp
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.meta-sftp.outputs.tags }}
+          labels: ${{ steps.meta-sftp.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
