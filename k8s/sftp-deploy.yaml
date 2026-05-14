@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sftp
+  namespace: asistente-correo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sftp
+  template:
+    metadata:
+      labels:
+        app: sftp
+    spec:
+      containers:
+      - name: sftp
+        image: tuusuario/asistente-sftp:latest
+        ports:
+        - containerPort: 22
+        volumeMounts:
+        - name: web-code
+          mountPath: /var/www/html
+        - name: sftp-users-secret
+          mountPath: /users.conf
+          subPath: users.conf
+      volumes:
+      - name: web-code
+        persistentVolumeClaim:
+          claimName: web-code-pvc
+      - name: sftp-users-secret
+        secret:
+          secretName: sftp-users
+          items:
+          - key: users.conf
+            path: users.conf
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sftp-svc
+  namespace: asistente-correo
+  annotations:
+    metallb.universe.tf/address-pool: "first-pool"
+spec:
+  type: LoadBalancer
+  selector:
+    app: sftp
+  ports:
+    - port: 22
+      targetPort: 22
