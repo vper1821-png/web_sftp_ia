@@ -1,0 +1,41 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: procesador-correos
+  namespace: asistente-correo
+spec:
+  schedule: "*/5 * * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: worker
+            image: tuusuario/asistente-web:latest
+            command: ["php", "/var/www/html/worker.php"]
+            env:
+            - name: DB_HOST
+              value: mysql-svc
+            - name: DB_NAME
+              value: correos_db
+            - name: DB_USER
+              value: appuser
+            - name: DB_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-pass
+                  key: user-password
+            - name: IMAP_SERVER
+              valueFrom:
+                secretKeyRef:
+                  name: creds-email
+                  key: imap-server
+            # ... todas las demás variables IMAP/SMTP
+            volumeMounts:
+            - name: web-code
+              mountPath: /var/www/html
+          volumes:
+          - name: web-code
+            persistentVolumeClaim:
+              claimName: web-code-pvc
+          restartPolicy: OnFailure
